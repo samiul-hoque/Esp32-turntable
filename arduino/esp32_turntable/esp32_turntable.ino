@@ -3,44 +3,58 @@
 #include <WebServer.h>
 #include <AccelStepper.h>
 
-
-// === Wi-Fi Credentials ===
-const char* ssid = "Vinci";
-const char* password = "asdfzxcv";
-
 // === Stepper Motor Configuration ===
 #define STEP_PIN 18
 #define DIR_PIN 19
 #define ENABLE_PIN 21
-const int stepsPerRev = 200*16;
+
+const int microsteps = 16;
+const int stepsPerRev = 200 * microsteps;
+const float gearRatio = 4.0; // Turntable:Motor ratio
 
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 WebServer server(80);
 
+// Status buffer to send back
+String lastStatus = "";
+
 // === Stepper Control ===
 void rotateStepper(int angle, int durationMs, bool reverse) {
-  int steps = (angle * stepsPerRev) / 360;
+  int steps = (angle * stepsPerRev * gearRatio) / 360;
   if (steps == 0) return;
 
   digitalWrite(ENABLE_PIN, LOW); // Enable driver
 
   if (reverse) steps = -steps;
-  long targetPos = stepper.currentPosition() + steps;
-  stepper.moveTo(targetPos);
 
-  // Estimate speed from duration
-  float speed = abs((float)steps / ((float)durationMs / 1000.0));
-  speed = constrain(speed, 10, 1000); // Avoid too slow or too fast
+  float durationSec = durationMs / 1000.0;
+  float speed = abs((float)steps) / durationSec; // steps/sec
+
   stepper.setMaxSpeed(speed);
+  stepper.setSpeed((steps > 0) ? speed : -speed);
 
-  while (stepper.distanceToGo() != 0) {
-    stepper.run();
+  unsigned long start = millis();
+  long stepsMoved = 0;
+
+  while (millis() - start < durationMs) {
+    stepper.runSpeed();
+    stepsMoved = stepper.currentPosition();
   }
 
+  unsigned long actualDuration = millis() - start;
   digitalWrite(ENABLE_PIN, HIGH); // Disable driver
+
+  // Format status
+  lastStatus = "Rotation complete.<br>"
+               "Requested angle: " + String(angle) + "°<br>" +
+               "Requested duration: " + String(durationMs) + " ms<br>" +
+               "Actual duration: " + String(actualDuration) + " ms<br>" +
+               "Steps moved: " + String(abs(stepsMoved)) + "<br>" +
+               "Speed: " + String(speed, 2) + " steps/sec<br>" +
+               "Acceleration: N/A (not used)";
 }
 
-// === Root Page (HTML + CSS + JS) ===
+// === Root Page ===
 void handleRoot() {
   server.send(200, "text/html", R"rawliteral(
     <!DOCTYPE html>
@@ -62,7 +76,6 @@ void handleRoot() {
           border-radius: 10px;
           box-shadow: 0 0 15px rgba(0,0,0,0.2);
           width: 300px;
-          position: relative;
         }
         h2 { text-align: center; }
         label { margin: 10px 0 5px; display: block; }
@@ -88,24 +101,12 @@ void handleRoot() {
         input[type="submit"]:hover {
           background-color: #45a049;
         }
-        .spinner {
-          display: none;
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-        }
-        .spinner div {
-          width: 24px;
-          height: 24px;
-          border: 4px solid #4CAF50;
-          border-top: 4px solid transparent;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        .output {
+          margin-top: 20px;
+          padding: 10px;
+          background-color: #eef;
+          border-radius: 5px;
+          font-size: 14px;
         }
       </style>
     </head>
@@ -130,32 +131,27 @@ void handleRoot() {
           <input type="submit" value="Rotate">
         </form>
 
-        <div class="spinner" id="spinner">
-          <div></div>
-        </div>
+        <div class="output" id="statusBox"></div>
       </div>
 
       <script>
         const form = document.getElementById('controlForm');
-        const spinner = document.getElementById('spinner');
+        const statusBox = document.getElementById('statusBox');
 
         form.addEventListener('submit', function(e) {
           e.preventDefault();
-
           const formData = new FormData(form);
           const params = new URLSearchParams(formData).toString();
 
-          spinner.style.display = 'block';
+          statusBox.innerHTML = "Running...";
 
           fetch('/rotate?' + params)
             .then(response => response.text())
             .then(data => {
-              spinner.style.display = 'none';
-              alert("Rotation complete.");
+              statusBox.innerHTML = data;
             })
             .catch(error => {
-              spinner.style.display = 'none';
-              alert("Error: " + error);
+              statusBox.innerHTML = "Error: " + error;
             });
         });
       </script>
@@ -172,8 +168,9 @@ void handleRotate() {
     String dir = server.arg("direction");
     bool reverse = (dir == "reverse");
 
+    stepper.setCurrentPosition(0);  // Reset position
     rotateStepper(angle, time, reverse);
-    server.send(200, "text/plain", "OK");
+    server.send(200, "text/html", lastStatus);
   } else {
     server.send(400, "text/plain", "Missing parameters.");
   }
@@ -184,9 +181,6 @@ void setup() {
 
   pinMode(ENABLE_PIN, OUTPUT);
   digitalWrite(ENABLE_PIN, HIGH); // Disabled at startup
-
-  stepper.setMaxSpeed(1000);
-  stepper.setAcceleration(500);
 
   WiFi.begin(ssid, password);
   Serial.print("Connecting to Wi-Fi");
