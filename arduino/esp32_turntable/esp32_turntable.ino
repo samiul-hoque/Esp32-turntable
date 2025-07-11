@@ -59,14 +59,24 @@ void rotateStepper(int angle, int durationMs, bool reverse, int repetitions, int
   digitalWrite(ENABLE_PIN, HIGH); // Disable driver
 
   // Format status
-  lastStatus = "Rotation complete.<br>"
-               "Repetitions: " + String(repetitions) + "<br>" +
-               "Angle per rep: " + String(angle) + "°<br>" +
-               "Movement time per rep: " + String(durationMs) + " ms<br>" +
-               "Delay between reps: " + String(repDelayMs) + " ms<br>" +
-               "Total time: " + String(totalDuration) + " ms<br>" +
-               "Total steps: " + String(totalStepsMoved) + "<br>" +
-               "Speed: " + String(speed, 2) + " steps/sec";
+  float expectedTotalAngle = (float)angle * repetitions;
+  float actualTotalAngle = (float)totalStepsMoved * 360.0 / (stepsPerRev * gearRatio);
+  String directionStr = reverse ? "Reverse" : "Forward";
+  String totalTimeStr = totalDuration > 10000 ? String(totalDuration/1000.0, 1) + "s" : String(totalDuration) + "ms";
+  float speedRPM = speed * 60.0 / (stepsPerRev * gearRatio);
+  
+  lastStatus = String("<b>Sequence Complete!</b><br><br>") +
+               "<b>Movement:</b><br>" +
+               "• " + String(repetitions) + " repetitions<br>" +
+               "• " + String(angle) + "° per rep (" + directionStr + ")<br>" +
+               "• Total angle: " + String(expectedTotalAngle, 1) + "°<br><br>" +
+               "<b>Timing:</b><br>" +
+               "• Movement time per rep: " + String(durationMs) + "ms<br>" +
+               "• Delay between reps: " + String(repDelayMs) + "ms<br>" +
+               "• Total sequence time: " + totalTimeStr + "<br><br>" +
+               "<b>Technical:</b><br>" +
+               "• Steps moved: " + String(totalStepsMoved) + "<br>" +
+               "• Speed: " + String(speedRPM, 2) + " RPM";
 }
 
 // === Root Page ===
@@ -135,7 +145,7 @@ void handleRoot() {
           <label for="angle">Angle per Rep:</label>
           <input type="number" name="angle" min="0" required>
 
-          <label for="time">Travel Time per Rep (ms):</label>
+          <label for="time">Movement Time per Rep (ms):</label>
           <input type="number" name="time" min="100" required>
 
           <label for="repDelay">Delay Between Reps (ms):</label>
