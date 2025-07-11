@@ -18,8 +18,8 @@ WebServer server(80);
 // Status buffer to send back
 String lastStatus = "";
 
-// === Stepper Control ===
-void rotateStepper(int angle, int durationMs, bool reverse) {
+// === Stepper Control with Repetitions ===
+void rotateStepper(int angle, int durationMs, bool reverse, int repetitions, int repDelayMs) {
   int steps = (angle * stepsPerRev * gearRatio) / 360;
   if (steps == 0) return;
 
@@ -33,25 +33,50 @@ void rotateStepper(int angle, int durationMs, bool reverse) {
   stepper.setMaxSpeed(speed);
   stepper.setSpeed((steps > 0) ? speed : -speed);
 
-  unsigned long start = millis();
-  long stepsMoved = 0;
+  unsigned long totalStartTime = millis();
+  long totalStepsMoved = 0;
+  
+  // Execute repetitions
+  for (int rep = 1; rep <= repetitions; rep++) {
+    unsigned long start = millis();
+    long stepsMoved = 0;
 
-  while (millis() - start < durationMs) {
-    stepper.runSpeed();
-    stepsMoved = stepper.currentPosition();
+    // Execute single rotation
+    while (millis() - start < durationMs) {
+      stepper.runSpeed();
+      stepsMoved = stepper.currentPosition();
+    }
+    
+    totalStepsMoved += abs(stepsMoved);
+    
+    // Add delay between repetitions (except after the last one)
+    if (rep < repetitions && repDelayMs > 0) {
+      delay(repDelayMs);
+    }
   }
 
-  unsigned long actualDuration = millis() - start;
+  unsigned long totalDuration = millis() - totalStartTime;
   digitalWrite(ENABLE_PIN, HIGH); // Disable driver
 
   // Format status
-  lastStatus = "Rotation complete.<br>"
-               "Requested angle: " + String(angle) + "°<br>" +
-               "Requested duration: " + String(durationMs) + " ms<br>" +
-               "Actual duration: " + String(actualDuration) + " ms<br>" +
-               "Steps moved: " + String(abs(stepsMoved)) + "<br>" +
-               "Speed: " + String(speed, 2) + " steps/sec<br>" +
-               "Acceleration: N/A (not used)";
+  float expectedTotalAngle = (float)angle * repetitions;
+  float actualTotalAngle = (float)totalStepsMoved * 360.0 / (stepsPerRev * gearRatio);
+  String directionStr = reverse ? "Reverse" : "Forward";
+  String totalTimeStr = totalDuration > 10000 ? String(totalDuration/1000.0, 1) + "s" : String(totalDuration) + "ms";
+  float speedRPM = speed * 60.0 / (stepsPerRev * gearRatio);
+  
+  lastStatus = String("<b>Sequence Complete!</b><br><br>") +
+               "<b>Movement:</b><br>" +
+               "• " + String(repetitions) + " repetitions<br>" +
+               "• " + String(angle) + "° per rep (" + directionStr + ")<br>" +
+               "• Total angle: " + String(expectedTotalAngle, 1) + "°<br><br>" +
+               "<b>Timing:</b><br>" +
+               "• Movement time per rep: " + String(durationMs) + "ms<br>" +
+               "• Delay between reps: " + String(repDelayMs) + "ms<br>" +
+               "• Total sequence time: " + totalTimeStr + "<br><br>" +
+               "<b>Technical:</b><br>" +
+               "• Steps moved: " + String(totalStepsMoved) + "<br>" +
+               "• Speed: " + String(speedRPM, 2) + " RPM";
 }
 
 // === Root Page ===
@@ -114,11 +139,17 @@ void handleRoot() {
       <div class="container">
         <h2>Stepper Motor Control</h2>
         <form id="controlForm">
-          <label for="angle">Angle:</label>
+          <label for="repetitions">Repetitions:</label>
+          <input type="number" name="repetitions" min="1" value="1" required>
+
+          <label for="angle">Angle per Rep:</label>
           <input type="number" name="angle" min="0" required>
 
-          <label for="time">Time (ms):</label>
+          <label for="time">Movement Time per Rep (ms):</label>
           <input type="number" name="time" min="100" required>
+
+          <label for="repDelay">Delay Between Reps (ms):</label>
+          <input type="number" name="repDelay" min="0" value="0">
 
           <div class="direction-group">
             <label>Direction:</label>
@@ -167,9 +198,17 @@ void handleRotate() {
     int time = server.arg("time").toInt();
     String dir = server.arg("direction");
     bool reverse = (dir == "reverse");
+    
+    // Get repetitions and delay (default to 1 and 0 if not provided for backward compatibility)
+    int repetitions = server.hasArg("repetitions") ? server.arg("repetitions").toInt() : 1;
+    int repDelay = server.hasArg("repDelay") ? server.arg("repDelay").toInt() : 0;
+
+    // Validate inputs
+    if (repetitions < 1) repetitions = 1;
+    if (repDelay < 0) repDelay = 0;
 
     stepper.setCurrentPosition(0);  // Reset position
-    rotateStepper(angle, time, reverse);
+    rotateStepper(angle, time, reverse, repetitions, repDelay);
     server.send(200, "text/html", lastStatus);
   } else {
     server.send(400, "text/plain", "Missing parameters.");
