@@ -115,7 +115,7 @@ void rotateStepper(int angle, int durationMs, bool reverse, int repetitions, int
   lastStatus = String("<b>Sequence Complete!</b><br><br>");
   
   if (warnings.length() > 0) {
-    lastStatus += String("<b style='color: orange;'>⚠️ ") + warnings + String("</b><br><br>");
+    lastStatus += String("<b style='color: orange;'>WARNING: ") + warnings + String("</b><br><br>");
   }
   
   lastStatus += String("<b>Movement:</b><br>");
@@ -141,11 +141,12 @@ void handleRoot() {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Advanced Stepper Motor Control</title>
+      <title>Auleek Turntable Control</title>
+      <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'><path fill='%23fff' d='M256 256h512v96H256zM192 768l208-352h224l208 352H704L512 448 320 768z'/></svg>">
       <style>
         body {
-          font-family: Arial, sans-serif;
-          background-color: #f4f4f4;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+          background-color: #000000;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -155,80 +156,130 @@ void handleRoot() {
           box-sizing: border-box;
         }
         .container {
-          background: #fff;
+          background: #1a1a1a;
           padding: 30px;
           border-radius: 10px;
-          box-shadow: 0 0 15px rgba(0,0,0,0.2);
+          box-shadow: 0 0 25px rgba(255,255,255,0.1);
           width: 400px;
           max-width: 90vw;
+          border: 1px solid #333;
         }
-        h2 { text-align: center; color: #333; }
+        .header {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 25px;
+          gap: 15px;
+        }
+        .logo {
+          width: 32px;
+          height: 32px;
+          flex-shrink: 0;
+        }
+        h2 { 
+          color: #ffffff; 
+          font-weight: 700;
+          margin: 0;
+        }
         .limits-info {
-          background-color: #e8f4f8;
-          border-left: 4px solid #2196F3;
-          padding: 10px;
+          background-color: #2a2a2a;
+          border-left: 4px solid #ffffff;
+          padding: 15px;
           margin-bottom: 20px;
           font-size: 12px;
           border-radius: 4px;
+          color: #ffffff;
         }
         .limits-info h4 {
-          margin: 0 0 5px 0;
-          color: #1976D2;
+          margin: 0 0 8px 0;
+          color: #ffffff;
+          font-weight: 600;
         }
         label { 
           margin: 10px 0 5px; 
           display: block; 
-          font-weight: bold;
-          color: #555;
+          font-weight: 600;
+          color: #ffffff;
         }
         input[type="number"], input[type="submit"] {
           width: 100%;
-          padding: 8px;
+          padding: 10px;
           margin-bottom: 10px;
           border-radius: 4px;
-          border: 1px solid #ccc;
+          border: 1px solid #555;
           box-sizing: border-box;
+          background-color: #2a2a2a;
+          color: #ffffff;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
         }
-        .advanced-section {
-          background-color: #f9f9f9;
+        input[type="number"]:focus {
+          outline: none;
+          border-color: #ffffff;
+          background-color: #333;
+        }
+        input[type="number"]::placeholder {
+          color: #888;
+        }
+        .section {
+          background-color: #2a2a2a;
           padding: 15px;
           margin: 15px 0;
           border-radius: 5px;
-          border: 1px solid #e0e0e0;
+          border: 1px solid #444;
         }
-        .advanced-section h3 {
-          margin: 0 0 10px 0;
-          color: #666;
+        .section h3 {
+          margin: 0 0 15px 0;
+          color: #ffffff;
           font-size: 14px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         .direction-group {
-          margin-bottom: 15px;
+          margin-bottom: 10px;
         }
-        .direction-group input {
-          margin-right: 5px;
+        .direction-group input[type="radio"] {
+          width: auto;
+          margin-right: 8px;
+          margin-bottom: 5px;
+          accent-color: #ffffff;
+        }
+        .direction-group label {
+          display: inline;
+          margin: 0;
+          font-weight: 400;
+          color: #ffffff;
+        }
+        .radio-option {
+          margin-bottom: 8px;
         }
         input[type="submit"] {
-          background-color: #4CAF50;
-          color: white;
+          background-color: #ffffff;
+          color: #000000;
           border: none;
           cursor: pointer;
           font-size: 16px;
-          font-weight: bold;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          transition: all 0.3s ease;
         }
         input[type="submit"]:hover {
-          background-color: #45a049;
+          background-color: #e0e0e0;
+          transform: translateY(-1px);
         }
         .output {
           margin-top: 20px;
           padding: 15px;
-          background-color: #eef;
+          background-color: #2a2a2a;
           border-radius: 5px;
           font-size: 14px;
-          border: 1px solid #ddd;
+          border: 1px solid #444;
+          color: #ffffff;
         }
         .hint {
           font-size: 11px;
-          color: #888;
+          color: #aaa;
           margin-top: -8px;
           margin-bottom: 10px;
         }
@@ -236,10 +287,15 @@ void handleRoot() {
     </head>
     <body>
       <div class="container">
-        <h2>Advanced Stepper Motor Control</h2>
+        <div class="header">
+          <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+            <path fill="#fff" d="M256 256h512v96H256zM192 768l208-352h224l208 352H704L512 448 320 768z"/>
+          </svg>
+          <h2>Auleek Turntable Control</h2>
+        </div>
         
         <div class="limits-info">
-          <h4> System Limits</h4>
+          <h4>System Limits</h4>
           <div>Max Speed: )rawliteral");
   
   html += String(MAX_SPEED_RPM, 1) + String(R"rawliteral( RPM</div>
@@ -250,28 +306,38 @@ void handleRoot() {
         </div>
 
         <form id="controlForm">
-          <label for="repetitions">Repetitions:</label>
-          <input type="number" name="repetitions" min="1" value="1" required>
+          <div class="section">
+            <h3>Movement Parameters</h3>
+            
+            <label for="repetitions">Repetitions:</label>
+            <input type="number" name="repetitions" min="1" value="1" required>
 
-          <label for="angle">Angle per Rep (degrees):</label>
-          <input type="number" name="angle" min="0" required>
+            <label for="angle">Angle per Rep (degrees):</label>
+            <input type="number" name="angle" min="0" required>
 
-          <label for="time">Movement Time per Rep (ms):</label>
-          <input type="number" name="time" min="100" required>
+            <label for="time">Movement Time per Rep (ms):</label>
+            <input type="number" name="time" min="100" required>
 
-          <label for="repDelay">Delay Between Reps (ms):</label>
-          <input type="number" name="repDelay" min="0" value="0">
-
-          <div class="direction-group">
-            <label>Direction:</label>
-            <input type="radio" id="forward" name="direction" value="forward" checked>
-            <label for="forward">Forward</label><br>
-            <input type="radio" id="reverse" name="direction" value="reverse">
-            <label for="reverse">Reverse</label>
+            <label for="repDelay">Delay Between Reps (ms):</label>
+            <input type="number" name="repDelay" min="0" value="0">
           </div>
 
-          <div class="advanced-section">
-            <h3> Motion Profile (Optional)</h3>
+          <div class="section">
+            <h3>Direction</h3>
+            <div class="direction-group">
+              <div class="radio-option">
+                <input type="radio" id="forward" name="direction" value="forward" checked>
+                <label for="forward">Forward</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="reverse" name="direction" value="reverse">
+                <label for="reverse">Reverse</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Motion Profile (Optional)</h3>
             
             <label for="acceleration">Acceleration (RPM/s):</label>
             <input type="number" name="acceleration" min="0.1" step="0.1" placeholder=")rawliteral");
@@ -309,7 +375,7 @@ void handleRoot() {
               statusBox.innerHTML = data;
             })
             .catch(error => {
-              statusBox.innerHTML = "<span style='color: red;'> Error: " + error + "</span>";
+              statusBox.innerHTML = "<span style='color: red;'>Error: " + error + "</span>";
             });
         });
       </script>
