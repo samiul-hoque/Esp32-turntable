@@ -30,7 +30,7 @@ A compact, heavy-duty turntable powered by an **ESP32** and a **NEMA 17 stepper 
 The client-facing version of this section is [docs/CLIENT_GUIDE.md](docs/CLIENT_GUIDE.md).
 
 1. **Power on.** The turntable reconnects to the last Wi-Fi network it knew.
-2. **Companion app (Bluetooth):** open the app URL in Chrome or Edge and press **Connect**.
+2. **Companion app (Bluetooth):** open **https://samiulmakes.com/Esp32-turntable/** in Chrome or Edge and press **Connect**.
    - The **Wi-Fi** tab shows the IP address, or the reason it can't connect.
    - From there you can scan for networks and switch to another one.
 3. **Browser:** open `http://<ip>` or `http://turntable.local`.
@@ -114,9 +114,7 @@ The v2 partition table is `min_spiffs` (two 1.9 MB app slots for OTA). It is wri
 cd app && python -m http.server 8000     # then open http://localhost:8000 in Chrome
 ```
 
-`localhost` counts as a secure context, so Web Bluetooth works without HTTPS. For the client, the app is published from `main` to GitHub Pages by `.github/workflows/pages.yml`.
-- Enable it once: *Settings → Pages → Source: GitHub Actions*.
-- On a private repo without a paid plan, deploy `app/` to Cloudflare Pages instead.
+`localhost` counts as a secure context, so Web Bluetooth works without HTTPS. For the client, `.github/workflows/pages.yml` publishes the app to **https://samiulmakes.com/Esp32-turntable/** (GitHub Pages, HTTPS enforced) on every push to `main` that touches `app/`. Only `main` is allowed to deploy.
 
 ### OTA update
 Go to `http://<ip>/update`, log in as `admin` with the OTA password, and upload `.pio/build/release/firmware.bin`. Or use curl:

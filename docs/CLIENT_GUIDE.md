@@ -6,7 +6,7 @@
 - Your Wi-Fi network name and password. The turntable uses **2.4 GHz** Wi-Fi.
 
 ## Open the app
-Go to: **`<APP LINK>`**
+Go to: **https://samiulmakes.com/Esp32-turntable/**
 
 On Android you can tap ⋮ → *Add to Home screen* to keep it like an app.
 
