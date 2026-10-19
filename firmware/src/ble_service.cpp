@@ -41,10 +41,8 @@ class ServerCallbacks : public NimBLEServerCallbacks {
     // 30-50 ms interval, 5 s supervision timeout: tolerant of Wi-Fi coexistence gaps.
     server->updateConnParams(desc->conn_handle, 24, 40, 0, 500);
     // Keep advertising so a second phone/laptop can still connect.
+    // (advertiseOnDisconnect restarts it if the connection limit stopped it.)
     if (server->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS) NimBLEDevice::startAdvertising();
-  }
-  void onDisconnect(NimBLEServer* server, ble_gap_conn_desc* desc) override {
-    NimBLEDevice::startAdvertising();
   }
 };
 

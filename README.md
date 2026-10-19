@@ -121,16 +121,20 @@ cd app && python -m http.server 8000     # then open http://localhost:8000 in Ch
 Go to `http://<ip>/update`, log in as `admin` with the OTA password, and upload `.pio/build/release/firmware.bin`. Or use curl:
 
 ```sh
-curl -u admin:<password> -F firmware=@.pio/build/release/firmware.bin http://<ip>/update
+curl -u admin:<password> -H "Content-Type: application/octet-stream"      --data-binary @.pio/build/release/firmware.bin http://<ip>/update
 ```
 
-- Uploads are refused while the turntable is moving.
+- The image must be sent as a raw body, as above. Form/multipart uploads are refused, because the core's multipart parser can hang if the sender disappears.
+- An upload takes about 30–40 s. Uploads are refused while the turntable is moving.
+- An abandoned upload times out after a few seconds; the device carries on with its current firmware.
 - The image is verified before the device switches to it, so a failed or interrupted upload leaves the current firmware running.
 - An image that boots but misbehaves is **not** rolled back automatically. Test releases on a bench unit first; USB is the recovery path.
 
 ### Architecture
 - **Core 1:** `loop()` only runs the stepper (`motion::update()`), as tight as v1's blocking loop, so motion is just as smooth.
 - **Core 0:** the `net` task runs the web server, the Wi-Fi manager and the BLE event pump.
+  - It runs at idle priority, so busy-waits inside library code can't starve the idle task into a watchdog reset.
+  - A software watchdog (`watchdog.cpp`) restarts the device if this task stalls for 60 s while the turntable is idle.
 - Commands from HTTP and BLE go through one dispatcher, `api::handleCommand`, so both transports behave the same.
 - The v1 `/rotate` endpoint is unchanged: it blocks, then returns the HTML report. Anything scripted against v1 keeps working.
 
@@ -166,7 +170,8 @@ curl -u admin:<password> -F firmware=@.pio/build/release/firmware.bin http://<ip
 | Won't join Wi-Fi | Serial monitor `[wifi]` lines, or the app's Wi-Fi tab. The readable reason comes from the disconnect code: *Network not found* (name, or a 5 GHz-only network), *Wrong password*, *Signal lost*, and so on. |
 | App can't find the turntable | Bluetooth on? Android: Location on. Mac: Chrome needs Bluetooth permission. `chrome://bluetooth-internals` lists nearby devices. |
 | Raw BLE testing | **nRF Connect** app: write JSON to the command characteristic, subscribe to events. |
-| Unexplained restarts | `resetReason` in the app's *Copy diagnostics* or `/api/info` (`brownout` points to the power supply). |
+| Unexplained restarts | `resetReason` in the app's *Copy diagnostics* or `/api/info` (`brownout` points to the power supply). If the device restarted itself, `lastFault` says why. |
+| Web page / app stop responding while Bluetooth still works | The network-task watchdog logs `[watchdog] network task stalled …` over serial. After 60 s (when idle) it restarts the device and reports `lastFault`. |
 
 ---
 

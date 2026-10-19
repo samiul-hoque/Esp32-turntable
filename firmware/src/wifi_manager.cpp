@@ -331,6 +331,9 @@ void tick() {
       tickAttempt(now);
       break;
     case StaState::Connected:
+      // "Offline since" = last moment we were connected, so leaving Connected for any
+      // reason (lost link, credential test) starts the hotspot timer from now.
+      s_offlineSince = now;
       if (!staConnected()) {
         s_lastReason = ev_lastReason;
         s_offlineSince = now;

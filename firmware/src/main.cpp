@@ -8,14 +8,19 @@
 #include "config.h"
 #include "device.h"
 #include "motion.h"
+#include "watchdog.h"
 #include "web_ui.h"
 #include "wifi_manager.h"
 
 static void netTask(void*) {
   for (;;) {
+    watchdog::beat("web");
     web::tick();
+    watchdog::beat("wifi");
     wifimgr::tick();
+    watchdog::beat("ble");
     ble::tick();
+    watchdog::beat("idle");
     vTaskDelay(1);
   }
 }
@@ -37,7 +42,12 @@ void setup() {
   web::begin();
   ble::begin();
 
-  xTaskCreatePinnedToCore(netTask, "net", 8192, nullptr, 1, nullptr, 0);
+  watchdog::begin();
+  // Idle priority on purpose: library code in this task (WebServer, Stream::timedRead)
+  // busy-waits without yielding. At priority 0 FreeRTOS time-slices it with the idle
+  // task, so a slow client can never starve IDLE0 into a task-watchdog reset.
+  // Wi-Fi, BLE and lwIP run far above this, so networking itself is unaffected.
+  xTaskCreatePinnedToCore(netTask, "net", 8192, nullptr, tskIDLE_PRIORITY, nullptr, 0);
 }
 
 void loop() {

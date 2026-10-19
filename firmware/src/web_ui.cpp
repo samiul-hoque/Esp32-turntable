@@ -6,6 +6,7 @@
 #include "ota.h"
 #include "web_page.h"
 #include "web_ui.h"
+#include "watchdog.h"
 
 static WebServer s_server(80);
 
@@ -19,6 +20,7 @@ static void sendJson(int code, JsonDocument& doc) {
 // Keep Wi-Fi and BLE serviced while an HTTP handler waits (the web server
 // itself is not re-entrant, so it is the only thing paused).
 static void netYield() {
+  watchdog::beat("web:wait");
   wifimgr::tick();
   ble::tick();
   vTaskDelay(pdMS_TO_TICKS(10));
@@ -180,6 +182,14 @@ static void handleNotFound() {
   s_server.send(404, "text/plain", "Not found");
 }
 
+#ifdef TT_TEST_HOOKS
+// Freezes the network task to prove the software watchdog recovers the device.
+static void handleDebugStall() {
+  s_server.send(200, "text/plain", "stalling network task");
+  for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+}
+#endif
+
 namespace web {
 
 void begin() {
@@ -194,6 +204,9 @@ void begin() {
   s_server.on("/api/scan", HTTP_POST, handleApiScanPost);
   s_server.on("/api/wifi", HTTP_POST, handleApiWifi);
   ota::begin(s_server);
+#ifdef TT_TEST_HOOKS
+  s_server.on("/debug/stall", HTTP_POST, handleDebugStall);
+#endif
   s_server.onNotFound(handleNotFound);
   s_server.begin();
 }

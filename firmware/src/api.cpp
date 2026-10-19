@@ -1,6 +1,12 @@
 #include "api.h"
 #include "config.h"
 #include "device.h"
+#include "watchdog.h"
+
+// ArduinoJson 7 stores `const char*` values by pointer (assumed static) and only
+// copies `char*`. Every string that is not a literal or static buffer must go
+// through copy(), otherwise it dangles once the source struct goes out of scope.
+static char* copy(const char* s) { return const_cast<char*>(s); }
 
 static const char* LOCKED_MSG =
     "Wi-Fi settings are locked while connected. Power-cycle the turntable, then change Wi-Fi within 10 minutes.";
@@ -67,15 +73,15 @@ void motionJson(JsonObject o, const MotionStatus& s) {
   o["decel"] = serialized(String(s.plan.decelRpm, 1));
   o["steps"] = s.totalStepsMoved;
   o["actualAngle"] = serialized(String(stepsToDegrees(s.totalStepsMoved), 1));
-  if (s.plan.warnings[0]) o["warnings"] = s.plan.warnings;
+  if (s.plan.warnings[0]) o["warnings"] = copy(s.plan.warnings);
 }
 
 void wifiJson(JsonObject o, const wifimgr::Info& i) {
   o["state"] = wifimgr::stateName(i.state);
   o["configured"] = i.hasCredentials;
-  o["ssid"] = i.ssid;
+  o["ssid"] = copy(i.ssid);
   if (i.ip[0]) {
-    o["ip"] = i.ip;
+    o["ip"] = copy(i.ip);
     o["rssi"] = i.rssi;
     o["channel"] = i.channel;
     o["host"] = HOSTNAME ".local";
@@ -87,8 +93,8 @@ void wifiJson(JsonObject o, const wifimgr::Info& i) {
   if (i.state == wifimgr::StaState::WaitingRetry) o["retryIn"] = i.nextRetrySec;
   o["hotspot"] = i.apActive;
   if (i.apActive) {
-    o["hotspotSsid"] = i.apSsid;
-    o["hotspotIp"] = i.apIp;
+    o["hotspotSsid"] = copy(i.apSsid);
+    o["hotspotIp"] = copy(i.apIp);
     o["hotspotClients"] = i.apClients;
   }
   o["setupAllowed"] = i.setupAllowed;
@@ -98,8 +104,8 @@ void testJson(JsonObject o, const wifimgr::TestResult& t) {
   o["id"] = t.id;
   o["state"] = wifimgr::testStateName(t.state);
   if (t.state == wifimgr::TestState::None) return;
-  o["ssid"] = t.ssid;
-  if (t.state == wifimgr::TestState::Ok) o["ip"] = t.ip;
+  o["ssid"] = copy(t.ssid);
+  if (t.state == wifimgr::TestState::Ok) o["ip"] = copy(t.ip);
   if (t.state == wifimgr::TestState::Failed) {
     o["reason"] = t.reason;
     o["reasonText"] = wifimgr::reasonText(t.reason);
@@ -112,6 +118,7 @@ void infoJson(JsonObject o) {
   o["device"] = device::name();
   o["uptime"] = device::uptimeSec();
   o["resetReason"] = device::resetReason();
+  if (watchdog::lastFault()[0]) o["lastFault"] = watchdog::lastFault();
   o["freeHeap"] = ESP.getFreeHeap();
   o["minFreeHeap"] = ESP.getMinFreeHeap();
   JsonObject lim = o["limits"].to<JsonObject>();
@@ -133,7 +140,7 @@ void handleCommand(JsonVariantConst cmd, JsonObject reply) {
   reply["type"] = "reply";
   if (!cmd["id"].isNull()) reply["id"] = cmd["id"];
   const char* name = cmd["cmd"] | "";
-  reply["cmd"] = name;
+  reply["cmd"] = copy(name);
 
   if (strcmp(name, "rotate") == 0) {
     handleRotate(cmd, reply);
