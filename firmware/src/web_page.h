@@ -107,6 +107,8 @@ static const char WEB_PAGE[] = R"rawliteral(<!DOCTYPE html>
     }
     .output:empty { display: none; }
     .hint { font-size: 11px; color: #aaa; margin-top: -8px; margin-bottom: 10px; }
+    .summary { font-size: 12px; color: #aaa; margin: 4px 0 10px; line-height: 1.45; }
+    .summary .warn { display: block; margin-top: 4px; }
     .device { font-size: 11px; color: #aaa; text-align: center; margin-top: 15px; }
     .warn { color: orange; }
     .err { color: #ff6b6b; }
@@ -148,15 +150,19 @@ static const char WEB_PAGE[] = R"rawliteral(<!DOCTYPE html>
 
         <label for="repetitions">Repetitions:</label>
         <input type="number" name="repetitions" min="1" value="1" required>
+        <div class="hint">How many times to repeat the move</div>
 
         <label for="angle">Angle per Rep (degrees):</label>
-        <input type="number" name="angle" min="0" required>
+        <input type="number" name="angle" min="0" value="90" required>
+        <div class="hint">90 = quarter turn, 360 = full turn</div>
 
         <label for="time">Movement Time per Rep (ms):</label>
-        <input type="number" name="time" min="100" required>
+        <input type="number" name="time" min="100" value="2000" required>
+        <div class="hint">Sets the speed: 1000 ms = 1 second. Shorter is faster</div>
 
         <label for="repDelay">Delay Between Reps (ms):</label>
         <input type="number" name="repDelay" min="0" value="0">
+        <div class="hint">Pause between moves</div>
       </div>
 
       <div class="section">
@@ -178,13 +184,14 @@ static const char WEB_PAGE[] = R"rawliteral(<!DOCTYPE html>
 
         <label for="acceleration">Acceleration (RPM/s):</label>
         <input type="number" name="acceleration" min="0.1" step="0.1" placeholder="{{DEF_ACCEL}} (default)">
-        <div class="hint">How quickly to reach target speed</div>
+        <div class="hint">How quickly to reach target speed. Leave empty for the default</div>
 
         <label for="deceleration">Deceleration (RPM/s):</label>
         <input type="number" name="deceleration" min="0.1" step="0.1" placeholder="{{DEF_DECEL}} (default)">
         <div class="hint">How quickly to slow down and stop</div>
       </div>
 
+      <div class="summary" id="moveSummary"></div>
       <input type="submit" value="Rotate">
       <button type="button" class="stop" id="stopBtn">Stop</button>
     </form>
@@ -196,6 +203,35 @@ static const char WEB_PAGE[] = R"rawliteral(<!DOCTYPE html>
   <script>
     const $ = id => document.getElementById(id);
     const form = $('controlForm');
+    const LIMITS = { maxSpeedRpm: {{MAX_SPEED}}, maxAccelRpmS: {{MAX_ACCEL}}, defaultAccelRpmS: {{DEF_ACCEL}} };
+
+    // Predicts what the firmware will do: one rate for speeding up and slowing down,
+    // and each rep is cut off at 2x its time. Same model as the companion app.
+    function updateSummary() {
+      const num = (n, d) => { const v = form.elements[n].value.trim(); return v === '' ? d : Number(v); };
+      const revs = Math.abs(num('angle', NaN)) / 360, time = num('time', NaN);
+      const reps = Math.max(1, num('repetitions', 1)), delay = Math.max(0, num('repDelay', 0));
+      const box = $('moveSummary');
+      box.textContent = '';
+      if (!(revs > 0) || !(time > 0)) return;
+      let rpm = revs / (time / 60000);
+      const clamped = rpm > LIMITS.maxSpeedRpm;
+      if (clamped) rpm = LIMITS.maxSpeedRpm;
+      const accelIn = num('acceleration', NaN);
+      const accel = Math.min(accelIn > 0 ? accelIn : LIMITS.defaultAccelRpmS, LIMITS.maxAccelRpmS);
+      const v = rpm / 60, a = accel / 60;
+      const moveS = revs >= v * v / a ? revs / v + v / a : 2 * Math.sqrt(revs / a);
+      const perRep = Math.min(moveS, 2 * time / 1000);
+      const total = perRep * reps + (reps - 1) * delay / 1000;
+      const fmt = s => s < 60 ? s.toFixed(1) + ' s' : Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s';
+      const line = document.createElement('span');
+      line.textContent = '≈ ' + rpm.toFixed(1) + ' RPM · each move ≈ ' + fmt(perRep) + ' · whole sequence ≈ ' + fmt(total);
+      box.appendChild(line);
+      const warn = text => { const w = document.createElement('span'); w.className = 'warn'; w.textContent = text; box.appendChild(w); };
+      if (clamped) warn('Faster than the ' + LIMITS.maxSpeedRpm + ' RPM limit, so it will run at ' + LIMITS.maxSpeedRpm + ' RPM instead.');
+      if (moveS > 2 * time / 1000) warn('Too short to finish at this acceleration: the move will stop before the full angle. Use a longer time or a higher acceleration.');
+    }
+    form.addEventListener('input', updateSummary);
     const statusBox = $('statusBox');
     let pollTimer = null;
 
@@ -316,6 +352,7 @@ static const char WEB_PAGE[] = R"rawliteral(<!DOCTYPE html>
     });
 
     loadInfo();
+    updateSummary();
     pollMotion(false);  // resume progress display if a move is already running
   </script>
 </body>

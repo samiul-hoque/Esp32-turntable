@@ -93,7 +93,9 @@ button.linklike {
   font-size: 13px; text-decoration: underline; letter-spacing: 0; padding: 8px 0;
 }
 
-.hint { font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
+.hint { font-size: 12px; color: var(--muted); margin: -2px 0 8px; }
+.summary { font-size: 13px; color: var(--muted); margin: 4px 0 8px; line-height: 1.45; }
+.summary .warn { display: block; margin-top: 4px; }
 .notice { font-size: 13px; line-height: 1.45; margin-top: 10px; color: var(--muted); }
 .notice.warn, .warn { color: var(--warn); }
 .ok { color: var(--ok); }

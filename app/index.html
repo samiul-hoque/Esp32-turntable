@@ -42,12 +42,16 @@
           <h3>Movement Parameters</h3>
           <label for="repetitions">Repetitions</label>
           <input type="number" id="repetitions" min="1" value="1" inputmode="numeric">
+          <div class="hint">How many times to repeat the move</div>
           <label for="angle">Angle per Rep (degrees)</label>
-          <input type="number" id="angle" min="0" inputmode="numeric">
+          <input type="number" id="angle" min="0" value="90" inputmode="numeric">
+          <div class="hint">90 = quarter turn, 360 = full turn</div>
           <label for="time">Movement Time per Rep (ms)</label>
-          <input type="number" id="time" min="100" inputmode="numeric">
+          <input type="number" id="time" min="100" value="2000" inputmode="numeric">
+          <div class="hint">Sets the speed: 1000 ms = 1 second. Shorter is faster</div>
           <label for="repDelay">Delay Between Reps (ms)</label>
           <input type="number" id="repDelay" min="0" value="0" inputmode="numeric">
+          <div class="hint">Pause between moves</div>
         </div>
         <div class="section">
           <h3>Direction</h3>
@@ -58,11 +62,12 @@
           <h3>Motion Profile (Optional)</h3>
           <label for="acceleration">Acceleration (RPM/s)</label>
           <input type="number" id="acceleration" min="0.1" step="0.1" placeholder="10.0 (default)" inputmode="decimal">
-          <div class="hint">How quickly to reach target speed</div>
+          <div class="hint">How quickly to reach target speed. Leave empty for the default</div>
           <label for="deceleration">Deceleration (RPM/s)</label>
           <input type="number" id="deceleration" min="0.1" step="0.1" placeholder="10.0 (default)" inputmode="decimal">
           <div class="hint">How quickly to slow down and stop</div>
         </div>
+        <div class="summary" id="moveSummary"></div>
         <button type="submit" id="rotateBtn">Rotate</button>
         <button type="button" class="stop" id="stopBtn">Stop</button>
       </form>

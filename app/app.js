@@ -267,6 +267,52 @@ function readNumber(id, fallback) {
   return v === '' ? fallback : Number(v);
 }
 
+// Predicts what the firmware will do (same model as AccelStepper: one rate for speeding up
+// and slowing down; each rep is cut off at 2x its time, as in v1).
+function estimateMove(p, lim) {
+  const revs = Math.abs(p.angle) / 360;
+  if (!(revs > 0) || !(p.time > 0)) return null;
+  let rpm = revs / (p.time / 60000);
+  const clamped = rpm > lim.maxSpeedRpm;
+  if (clamped) rpm = lim.maxSpeedRpm;
+  const accel = Math.min(p.accel > 0 ? p.accel : lim.defaultAccelRpmS, lim.maxAccelRpmS);
+  const v = rpm / 60, a = accel / 60;  // rev/s, rev/s^2
+  const moveS = revs >= v * v / a ? revs / v + v / a : 2 * Math.sqrt(revs / a);
+  const cutoffS = 2 * p.time / 1000;
+  const perRepS = Math.min(moveS, cutoffS);
+  return { rpm, clamped, moveS: perRepS, cutOff: moveS > cutoffS, totalS: perRepS * p.reps + Math.max(0, p.reps - 1) * p.delay / 1000 };
+}
+
+function formatSeconds(s) {
+  return s < 60 ? s.toFixed(1) + ' s' : Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s';
+}
+
+function updateSummary() {
+  const lim = (app.info && app.info.limits) ||
+    { maxSpeedRpm: 60, maxAccelRpmS: 30, defaultAccelRpmS: 10 };
+  const est = estimateMove({
+    angle: readNumber('angle', NaN), time: readNumber('time', NaN), reps: Math.max(1, readNumber('repetitions', 1)),
+    delay: Math.max(0, readNumber('repDelay', 0)), accel: readNumber('acceleration', NaN),
+  }, lim);
+  const box = $('moveSummary');
+  if (!est) { box.replaceChildren(); return; }
+  const parts = [el('span', { text: '≈ ' + est.rpm.toFixed(1) + ' RPM · each move ≈ ' + formatSeconds(est.moveS) +
+                                    ' · whole sequence ≈ ' + formatSeconds(est.totalS) })];
+  if (est.clamped) {
+    parts.push(el('span', { class: 'warn', text: 'Faster than the ' + lim.maxSpeedRpm + ' RPM limit, so it will run at ' +
+                                                 lim.maxSpeedRpm + ' RPM instead.' }));
+  }
+  if (est.cutOff) {
+    parts.push(el('span', { class: 'warn', text: 'Too short to finish at this acceleration: the move will stop before the full angle. ' +
+                                                 'Use a longer time or a higher acceleration.' }));
+  }
+  box.replaceChildren(...parts);
+}
+
+for (const id of ['repetitions', 'angle', 'time', 'repDelay', 'acceleration']) {
+  $(id).addEventListener('input', updateSummary);
+}
+
 $('rotateForm').addEventListener('submit', async e => {
   e.preventDefault();
   const cmd = {
@@ -486,6 +532,7 @@ function onInfo(info) {
   $('deceleration').placeholder = p.defaultDecelRpmS.toFixed(1) + ' (default)';
   if (info.wifi) onWifi(info.wifi);
   renderDeviceInfo();
+  updateSummary();
 }
 
 function renderDeviceInfo() {
@@ -501,6 +548,7 @@ function renderDeviceInfo() {
     ['Last restart', info.resetReason.replace('_', ' ')],
     ['Uptime at connect', formatUptime(info.uptime)],
   ];
+  if (info.lastFault) rows.push(['Last problem', 'Restarted itself: ' + info.lastFault]);
   $('deviceInfo').replaceChildren(...rows.flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: String(v) })]));
 }
 
@@ -546,6 +594,7 @@ $('connectBtn').addEventListener('click', connect);
 $('disconnectBtn').addEventListener('click', disconnect);
 $('appVersion').textContent = APP_VERSION;
 setConn('', 'Not connected');
+updateSummary();
 if (!navigator.bluetooth) {
   help('This browser can\'t use Bluetooth. Open this page in <b>Chrome</b> or <b>Edge</b> on Android, Windows or Mac. ' +
        '(On iPhone/iPad, use the free <b>Bluefy</b> browser.)');
