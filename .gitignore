@@ -32,3 +32,11 @@
 *.app
 
 secrets.h
+
+# PlatformIO
+.pio/
+.vscode/*
+!.vscode/extensions.json
+
+# Flash backups (keep outside git / attach to releases)
+*.bin
