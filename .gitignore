@@ -40,3 +40,7 @@ secrets.h
 
 # Flash backups (keep outside git / attach to releases)
 *.bin
+
+# Python
+__pycache__/
+.venv/

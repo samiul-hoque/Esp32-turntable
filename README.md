@@ -74,6 +74,7 @@ Esp32-turntable/
 │   └── test/                    native unit tests (motion math)
 ├── app/                         Bluetooth companion app (plain HTML/JS, no build step)
 ├── legacy/                      v1 firmware as delivered (frozen; see legacy/README.md)
+├── tools/bench/                 automated bench tests (BLE, HTTP, OTA, watchdog)
 ├── docs/CLIENT_GUIDE.md         one-page guide for the client
 └── .github/workflows/           CI build + tests, app deploy to GitHub Pages
 ```
@@ -129,6 +130,14 @@ curl -u admin:<password> -H "Content-Type: application/octet-stream"      --data
 - An abandoned upload times out after a few seconds; the device carries on with its current firmware.
 - The image is verified before the device switches to it, so a failed or interrupted upload leaves the current firmware running.
 - An image that boots but misbehaves is **not** rolled back automatically. Test releases on a bench unit first; USB is the recovery path.
+
+### Bench tests
+`tools/bench/` has the automated test suites used to verify v2 on a real board:
+- BLE (~30 checks)
+- HTTP + OTA (~31 checks)
+- watchdog, setup-window lock, throughput
+
+See [tools/bench/README.md](tools/bench/README.md). Run them after any firmware change before it goes to the client.
 
 ### Architecture
 - **Core 1:** `loop()` only runs the stepper (`motion::update()`), as tight as v1's blocking loop, so motion is just as smooth.
